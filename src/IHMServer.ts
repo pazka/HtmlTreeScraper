@@ -45,4 +45,8 @@ parentPort?.on('message', (message: GeneralCrawlStatus) => {
     if (config.dumpCrawlerData) {
         fs.writeFileSync('crawlerData.dump', JSON.stringify(generalCrawlStatus, null, 2))
     }
+
+    if(config.dumpCrawlerMatches) {
+        fs.writeFileSync('crawlerMatches.dump', JSON.stringify(generalCrawlStatus.matches, null, 2))
+    }
 })
