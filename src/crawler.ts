@@ -12,76 +12,7 @@ import { WorkerData, CrawlerMatch, CrawlResult, RecursiveUrl } from "./types";
 if (isMainThread || !parentPort) {
     throw new Error('This file should not be executed directly, use index.ts');
 }
-
-(async () => {
-    const { urlToCrawl, regexToMatch, urlVisited, crawlerId }: WorkerData = workerData;
-    let newUrls: RecursiveUrl[] = []
-    let matches: CrawlerMatch[] = []
-
-    console.log(`[Crawler#${crawlerId}] - Received url to crawl`, urlToCrawl);
-    let response;
-    try {
-        response = await axios.get(urlToCrawl.newUrl);
-    } catch (e) {
-        console.error(`[Crawler#${crawlerId}] - Error while crawling url`, urlToCrawl);
-        return;
-    }
-
-    //test if the data is really html
-    if (!response.headers['content-type'].includes('text/html')) {
-        return;
-    }
-
-    const html = response.data;
-
-    if (config.dumpHtml) {
-        fs.writeFileSync(`dump/crawler_${crawlerId}.dump.html`, html);
-    }
-
-    //search for matches
-    const rawMatches = html.match(new RegExp(regexToMatch, 'g'));
-    if (rawMatches) {
-        console.log(`[Crawler#${crawlerId}] - Found ${rawMatches.length} matches !! `);
-
-        matches = rawMatches.map((match: string) => {
-            return {
-                where: urlToCrawl.newUrl,
-                what: match
-            }
-        });
-    }
-
-    const urls = extractAbsoluteUrlsFromHtml(urlToCrawl.newUrl, html);
-    if (!urls) {
-        return;
-    }
-
-    urls.forEach((url: string) => {
-        if (urlVisited.has(url)) {
-            return
-        }
-
-        const potentialUrl = { currentDepth: urlToCrawl.currentDepth + 1, newUrl: url, crawlerId } as RecursiveUrl;
-
-        for (const paternToIgnore of config.ignoreUrlPatterns) {
-            if (new RegExp(paternToIgnore).test(url)) {
-                return;
-            }
-        }
-
-        for (const paternToFollow of config.followUrlPatterns) {
-            if (!new RegExp(paternToFollow).test(url)) {
-                return;
-            }
-        }
-
-        newUrls.push(potentialUrl);
-    });
-
-    console.log(`[Crawler#${crawlerId}] - Crawled url,sending to main`, urlToCrawl);
-    parentPort?.postMessage({ newUrls, matches, crawlerId } as CrawlResult);
-})();
-
+const { urlToCrawl, regexToMatch, urlVisited, crawlerId }: WorkerData = workerData;
 
 function extractAbsoluteUrlsFromHtml(srcUrl: string, html: string): string[] {
     const baseUrl = new URL(srcUrl);
@@ -127,15 +58,85 @@ function cleanUrl(url: string): string {
     //remove line return, spaces, double slashes not after http(s)
     url = url.trim();
 
-    url = url.replace('\t', '');
-    url = url.replace('\r', '');
-    url = url.replace('\n', '');
-
     //remove spaces
-    url = url.replace(/ /g, '');
+    url = url.replace(/(\s|\n|\r|\t)*/g, '');
 
     //remove double slashes
     url = url.replace(/([^:]\/)\/+/g, '$1');
 
     return url;
 }
+
+
+
+async function crawlUrl(): Promise<CrawlResult> {
+    let newUrls: RecursiveUrl[] = []
+    let matches: CrawlerMatch[] = []
+
+    console.log(`[Crawler#${crawlerId}] - Received url to crawl`, urlToCrawl);
+    let response;
+    try {
+        response = await axios.get(urlToCrawl.newUrl);
+    } catch (e) {
+        console.error(`[Crawler#${crawlerId}] - Error while crawling url`, urlToCrawl);
+        return { newUrls: [], matches: [], crawlerId };
+    }
+
+    //test if the data is really html
+    if (!response.headers['content-type'].includes('text/html')) {
+        return { newUrls: [], matches: [], crawlerId };
+    }
+
+    const html = response.data;
+
+    if (config.dumpHtml) {
+        fs.writeFileSync(`dump/crawler_${crawlerId}.dump.html`, html);
+    }
+
+    //search for matches
+    const rawMatches = html.match(new RegExp(regexToMatch, 'g'));
+    if (rawMatches) {
+        console.log(`[Crawler#${crawlerId}] - Found ${rawMatches.length} matches !! `);
+
+        matches = rawMatches.map((match: string) => ({
+            where: urlToCrawl.newUrl,
+            what: match
+        }));
+    }
+
+    const urls = extractAbsoluteUrlsFromHtml(urlToCrawl.newUrl, html);
+    if (!urls) {
+        return { newUrls: [], matches: [], crawlerId };
+    }
+
+    urls.forEach((url: string) => {
+        if (urlVisited.has(url)) {
+            return
+        }
+
+        const potentialUrl = { currentDepth: urlToCrawl.currentDepth + 1, newUrl: url, crawlerId } as RecursiveUrl;
+
+        for (const paternToIgnore of config.ignoreUrlPatterns) {
+            if (url.match(new RegExp(paternToIgnore,'g'))) {
+                return;
+            }
+        }
+
+        for (const paternToFollow of config.followUrlPatterns) {
+            if (!url.match(new RegExp(paternToFollow,'g'))) {
+                return;
+            }
+        }
+
+        newUrls.push(potentialUrl);
+    });
+
+    return { newUrls, matches, crawlerId };
+}
+
+(async () => {
+    const { newUrls, matches } = await crawlUrl();
+
+    console.log(`[Crawler#${crawlerId}] - Crawled url,sending to main`);
+    parentPort?.postMessage({ newUrls, matches, crawlerId } as CrawlResult);
+})()

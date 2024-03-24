@@ -7,6 +7,7 @@ import { WorkerData, CrawlResult, CrawlerMatch, RecursiveUrl } from './types';
 
 const urlVisited = new Set<string>();
 const urlLeftToVisit = new Set<RecursiveUrl>();
+const simpleUrlLeftToVisit = new Set<string>();
 const allMatches : CrawlerMatch[] = []
 const currentWorkers = new Set<Worker>();
 let IHMServerWorker: Worker;
@@ -46,17 +47,15 @@ function updateIHMData() {
     });
 }
 
-function launchUrlCrawl(url: RecursiveUrl) {
+function launchUrlCrawl(urlToCrawl: RecursiveUrl) {
     const worker = new Worker("./src/crawler.ts", {
         workerData: {
-            urlToCrawl: url,
+            urlToCrawl: urlToCrawl,
             regexToMatch: regexToMatch,
             urlVisited: urlVisited,
             crawlerId: crawlerId++
         } as WorkerData,
     });
-
-    urlVisited.add(url.newUrl);
 
     worker.on('message', (message: CrawlResult) => {
         const { newUrls, matches, crawlerId } = message as CrawlResult;
@@ -67,16 +66,17 @@ function launchUrlCrawl(url: RecursiveUrl) {
             allMatches.push(match);
         });
 
-        newUrls.forEach((url: RecursiveUrl) => {
-            if (urlVisited.has(url.newUrl)) {
+        newUrls.forEach((newUrl: RecursiveUrl) => {
+            if (urlVisited.has(newUrl.newUrl) || simpleUrlLeftToVisit.has(newUrl.newUrl)) {
                 return;
             }
 
-            if(url.currentDepth >= config.maximumDepth) {
+            if(newUrl.currentDepth >= config.maximumDepth) {
                 return;
             }
 
-            urlLeftToVisit.add(url);
+            urlLeftToVisit.add(newUrl);
+            simpleUrlLeftToVisit.add(newUrl.newUrl);
         });
 
         currentWorkers.delete(worker);
@@ -93,7 +93,11 @@ setInterval(() => {
         let nbWorkersToStart = Math.min(config.maxNbWorkers - currentWorkers.size, urlLeftToVisit.size);
         for (let i = 0; i < nbWorkersToStart; i++) {
             const urlToVisit = urlLeftToVisit.values().next().value;
+
             urlLeftToVisit.delete(urlToVisit);
+            urlVisited.add(urlToVisit.newUrl);
+            simpleUrlLeftToVisit.delete(urlToVisit.newUrl);
+
             launchUrlCrawl(urlToVisit);
         }
     }
