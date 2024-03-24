@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Realtime Server Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            margin: 0;
+        }
+
+        h2 {
+            margin: 0;
+            padding: 10px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .match-item {
+            border: #333 2px solid;
+        }
+
+        match-item li,ul {
+            padding: initial;
+            border-bottom: initial;
+            list-style-type: initial;
+            padding: initial;
+            margin: initial;
+        }
+
+        .collapse {
+            display: none;
+        }
+
+        .collapse.show {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Realtime Server Status</h1>
+    <div>
+        <h2> Matches <button onclick="downloadMatches()">Download Matches</button></h2>
+        <ul id="matches">
+            <li>example.com at https://example.com/</li>
+        </ul>
+    </div>
+    <div>
+        <h2 id="visited-title">Visited URLs (?)</h2>
+        <div>
+            <button onclick="toggleCollapse()"> Expand/Collapase </button>
+            <ul class="collapse" id="visited">
+                <li>https://example.com/</li>
+
+            </ul>
+        </div>
+    </div>
+    <div>
+        <h2>Nb url left to visit</h2>
+        <p id="left-to-visit-number"></p>
+    </div>
+</body>
+
+<script>
+    let allData = {
+        urlVisited: [],
+        urlLeftToVisit: [],
+        matches: [
+            {
+                what: "example.com",
+                where: "https://example.com/"
+            }
+        ]
+    }
+
+    function toggleCollapse() {
+        let visitedContainer = document.getElementById('visited');
+        visitedContainer.classList.toggle('show');
+    }
+
+    function downloadMatches(){
+        let matches = allData.matches;
+        let matchesText = matches.map(match => `${match.where} at ${match.what}`).join('\n');
+        let blob = new Blob([matchesText], {type: 'text/plain'});
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = 'matches.txt';
+        a.click();
+    }
+
+    setInterval(function () {
+        //fetch JSON data from the server
+        fetch('/status')
+            .then(response => response.json())
+            .then(refreshData);
+    }, 5000);
+
+    function refreshData(data) {
+        //update the exampleData with the new data
+        allData = data;
+
+        //update the matches list
+        let matches = document.getElementById('matches');
+        matches.innerHTML = '';
+        data.matches.forEach(match => {
+            let li = document.createElement('li');
+            li.innerHTML = `<ul class="match-item"> <li><b>${match.where}</b></li><li><a href="${match.what}">${match.what}</a></li></ul>`;
+            matches.appendChild(li);
+        });
+
+        //update the visited URLs list
+        let visited = document.getElementById('visited');
+        visited.innerHTML = '';
+        data.urlVisited.forEach(url => {
+            let li = document.createElement('li');
+            li.innerText = url;
+            visited.appendChild(li);
+        });
+
+        //update the visited URLs title
+        let visitedTitle = document.getElementById('visited-title');
+        visitedTitle.innerText = `Visited URLs (${data.urlVisited.length})`;
+
+        //update the left to visit number
+        let leftToVisitNumber = document.getElementById('left-to-visit-number');
+        leftToVisitNumber.innerText = data.urlLeftToVisit.length;
+    }
+</script>
+
+</html>

@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "allowJs": false,
+        "noImplicitAny": true,
+        "esModuleInterop": true,    
+        "target": "esnext",
+        "module": "commonjs",
+        "strict": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules"]
+}
