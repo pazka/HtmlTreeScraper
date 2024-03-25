@@ -71,7 +71,7 @@ function launchUrlCrawl(urlToCrawl: RecursiveUrl) {
                 return;
             }
 
-            if(newUrl.currentDepth >= config.maximumDepth) {
+            if(newUrl.currentDepth >= config.maxDepth) {
                 return;
             }
 

@@ -19,7 +19,7 @@ function extractAbsoluteUrlsFromHtml(srcUrl: string, html: string): string[] {
     const protocol = baseUrl.protocol;
     const host = baseUrl.host;
 
-    const matchedUrls: string[] = []
+    const matchedUrls: Set<string> = new Set();
 
     //case  href="spip.php?..."
     const hrefRegex = /href="([^"]*)"/g;
@@ -27,31 +27,30 @@ function extractAbsoluteUrlsFromHtml(srcUrl: string, html: string): string[] {
     while ((match = hrefRegex.exec(html)) !== null) {
         const url = match[1];
         if (url.startsWith('http')) {
-            matchedUrls.push(url);
+            matchedUrls.add(url);
         } else if (url.startsWith('/')) {
-            matchedUrls.push(`${protocol}//${host}${url}`);
+            matchedUrls.add(`${protocol}//${host}${url}`);
         } else {
-            matchedUrls.push(`${srcUrl}/${url}`);
+            matchedUrls.add(`${srcUrl}/${url}`);
         }
     }
 
     //case http:// or https://
     const httpRegex = /http[s]*:\/\/[^'"]+/g;
     while ((match = httpRegex.exec(html)) !== null) {
-        matchedUrls.push(match[0]);
+        matchedUrls.add(match[0]);
     }
 
     //case www.qsd.com
     const wwwRegex = /[^'"]{,5}\.[^'"]+\.[^'"]{2,3}/g;
     while ((match = wwwRegex.exec(html)) !== null) {
-        matchedUrls.push(`https://${match[0]}`);
+        console.log("website match :" ,match[0]);
+        matchedUrls.add(`https://${match[0]}`);
     }
 
-    matchedUrls.forEach((url: string, index: number) => {
-        matchedUrls[index] = cleanUrl(url);
-    });
+    const cleanedUrls = Array.from(matchedUrls).map(cleanUrl);
 
-    return matchedUrls
+    return cleanedUrls;
 }
 
 function cleanUrl(url: string): string {
