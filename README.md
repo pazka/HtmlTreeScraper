@@ -38,7 +38,12 @@ so you just have to provide what's inside the `new RegExp()` function like `'.*\
 - `dumpCrawlerData` : dump the full status of the crawler in a `.dump` file
 - `dumpCrawlerMatches` : dump *ONLY* the matches found by the crawler in a `.matches` file
 
-## Usage
+## Usage Example 
+
+```bash
+npm i
+npm start -- <starting_point_url> <regex_to_match>
+```
 
 ```bash
 npm start -- https://data.seinesaintdenis.fr/ (href=.*\.csv)
